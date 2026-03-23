@@ -384,7 +384,7 @@ export default function App() {
             <button onClick={startGame} style={styles.button}>スタート</button>
           )}
           {status === "running" && (
-            <button onClick={resetGame} style={styles.ghostButton}>リセット</button>
+            <button onClick={() => resetGame()} style={styles.ghostButton}>リセット</button>
           )}
           {status === "gameover" && (
             <button onClick={startGame} style={styles.button}>もう一度</button>
