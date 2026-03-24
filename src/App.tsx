@@ -13,6 +13,13 @@ type Cell = { x: number; y: number };
 type Status = "idle" | "running" | "gameover";
 type SpeedMode = keyof typeof SPEED_OPTIONS;
 
+function getIsLandscape() {
+  return (
+    window.matchMedia("(orientation: landscape)").matches ||
+    window.innerWidth > window.innerHeight
+  );
+}
+
 const styles = {
   speedRow: {
     display: "flex",
@@ -203,6 +210,23 @@ const styles = {
     color: "#cbd5e1",
     lineHeight: 1.5,
   } as React.CSSProperties,
+  portraitNotice: {
+    fontSize: "12px",
+    color: "#cbd5e1",
+    textAlign: "center",
+    marginBottom: "8px",
+  } as React.CSSProperties,
+  overlayButton: {
+    marginTop: "14px",
+    border: "none",
+    borderRadius: "14px",
+    background: "#e2e8f0",
+    color: "#0f172a",
+    fontSize: "15px",
+    fontWeight: 800,
+    padding: "10px 16px",
+    cursor: "pointer",
+  } as React.CSSProperties,
 };
 
 function loadHighScores(): Record<SpeedMode, number> {
@@ -235,7 +259,9 @@ export default function App() {
   const [score, setScore] = useState(1);
   const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
   const [highScores, setHighScores] = useState<Record<SpeedMode, number>>({ slow: 0, normal: 0, fast: 0 });
-  const [isLandscape, setIsLandscape] = useState<boolean>(() => window.innerWidth >= window.innerHeight);
+  const [isLandscape, setIsLandscape] = useState<boolean>(() =>
+    getIsLandscape()
+  );
 
   const lastStepRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -245,9 +271,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onResize = () => setIsLandscape(window.innerWidth >= window.innerHeight);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const media = window.matchMedia("(orientation: landscape)");
+    const updateOrientation = () => setIsLandscape(getIsLandscape());
+
+    updateOrientation();
+    window.addEventListener("resize", updateOrientation);
+
+    if (media.addEventListener) {
+      media.addEventListener("change", updateOrientation);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateOrientation);
+      if (media.removeEventListener) {
+        media.removeEventListener("change", updateOrientation);
+      }
+    };
   }, []);
 
   const occupiedSet = useMemo(() => {
@@ -380,14 +419,8 @@ export default function App() {
           </div>
         </div>
         <div style={styles.actions}>
-          {status === "idle" && (
-            <button onClick={startGame} style={styles.button}>スタート</button>
-          )}
           {status === "running" && (
             <button onClick={() => resetGame()} style={styles.ghostButton}>リセット</button>
-          )}
-          {status === "gameover" && (
-            <button onClick={startGame} style={styles.button}>もう一度</button>
           )}
         </div>
 
@@ -410,19 +443,16 @@ export default function App() {
           ))}
         </div>
 
+        {!isLandscape && (
+          <div style={styles.portraitNotice}>
+            横向きにすると、フィールド全体が見やすくなります。
+          </div>
+        )}
+
         <div style={styles.boardWrap} onPointerDown={rotateDirection}>
           <div style={styles.boardAspect}>
             <div style={styles.boardGrid}>{cells}</div>
           </div>
-
-          {!isLandscape && (
-            <div style={styles.overlay}>
-              <div style={styles.overlayCard}>
-                <p style={styles.overlayTitle}>横向き推奨</p>
-                <div style={styles.overlayText}>スマホを横向きにすると、フィールド全体が見やすくなります。</div>
-              </div>
-            </div>
-          )}
 
           {status === "idle" && (
             <div style={styles.overlay}>
@@ -431,6 +461,7 @@ export default function App() {
                 <div style={styles.overlayText}>
                   左上から右へ進みます。外壁か自分の足跡にぶつかったら終了です。
                 </div>
+                <button onClick={() => startGame()} style={styles.overlayButton}>スタート</button>
               </div>
             </div>
           )}
@@ -440,6 +471,7 @@ export default function App() {
               <div style={styles.overlayCard}>
                 <p style={styles.overlayTitle}>Game Over</p>
                 <div style={styles.overlayText}>並んだ四角の数は <strong>{score}</strong> 個でした。</div>
+                <button onClick={() => startGame()} style={styles.overlayButton}>もう一度</button>
               </div>
             </div>
           )}
@@ -448,3 +480,4 @@ export default function App() {
     </div>
   );
 }
+
