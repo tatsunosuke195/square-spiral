@@ -457,7 +457,7 @@ export default function App() {
             style={{
               ...styles.boardAspect,
               width: isLandscape
-                ? "min(100%, calc((100dvh - 200px) * 25 / 15))"
+                ? "min(100%, calc((100dvh - 120px) * 25 / 15))"
                 : "100%",
             }}
           >
