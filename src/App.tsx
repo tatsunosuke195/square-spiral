@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const COLS = 25;
@@ -159,6 +160,8 @@ const styles = {
   boardAspect: {
     aspectRatio: `${COLS} / ${ROWS}`,
     width: "100%",
+    maxWidth: "100%",
+    margin: "0 auto",
   } as React.CSSProperties,
   boardGrid: {
     display: "grid",
@@ -450,7 +453,14 @@ export default function App() {
         )}
 
         <div style={styles.boardWrap} onPointerDown={rotateDirection}>
-          <div style={styles.boardAspect}>
+          <div
+            style={{
+              ...styles.boardAspect,
+              width: isLandscape
+                ? "min(100%, calc((100dvh - 250px) * 25 / 15))"
+                : "100%",
+            }}
+          >
             <div style={styles.boardGrid}>{cells}</div>
           </div>
 
@@ -480,4 +490,3 @@ export default function App() {
     </div>
   );
 }
-
