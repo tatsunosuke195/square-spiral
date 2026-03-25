@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 // ===== CONFIG =====
@@ -7,11 +6,11 @@ const ROWS = 15;
 
 const SPEED_OPTIONS = {
   slow: 115,
-  normal: 95,
-  fast: 78,
+  normal: 82,
+  fast: 60,
 } as const;
 
-const HIGHSCORE_KEY = "square-spiral-highscore-v2";
+const HIGHSCORE_KEY = "square-spiral-highscore-v3";
 
 // ===== TYPES =====
 type Cell = { x: number; y: number };
@@ -19,13 +18,6 @@ type Status = "idle" | "running" | "gameover";
 type SpeedMode = keyof typeof SPEED_OPTIONS;
 
 // ===== HELPERS =====
-function getIsLandscape() {
-  return (
-    window.matchMedia("(orientation: landscape)").matches ||
-    window.innerWidth > window.innerHeight
-  );
-}
-
 function loadHighScores(): Record<SpeedMode, number> {
   try {
     const raw = localStorage.getItem(HIGHSCORE_KEY);
@@ -62,7 +54,7 @@ const styles = {
   } as React.CSSProperties,
 
   container: {
-    maxWidth: "980px",
+    maxWidth: "480px",
     margin: "0 auto",
   } as React.CSSProperties,
 
@@ -182,11 +174,9 @@ const styles = {
     transform: "translateY(-1px)",
   } as React.CSSProperties,
 
-  portraitNotice: {
-    fontSize: "12px",
-    color: "#cbd5e1",
-    textAlign: "center",
-    marginBottom: "8px",
+  speedChipDisabled: {
+    opacity: 0.45,
+    cursor: "not-allowed",
   } as React.CSSProperties,
 
   boardWrap: {
@@ -294,9 +284,6 @@ export default function App() {
     normal: 0,
     fast: 0,
   });
-  const [isLandscape, setIsLandscape] = useState<boolean>(() =>
-    getIsLandscape()
-  );
 
   // ===== REFS =====
   const lastStepRef = useRef<number | null>(null);
@@ -305,26 +292,6 @@ export default function App() {
   // ===== INITIAL LOAD =====
   useEffect(() => {
     setHighScores(loadHighScores());
-  }, []);
-
-  // ===== ORIENTATION / RESIZE =====
-  useEffect(() => {
-    const media = window.matchMedia("(orientation: landscape)");
-    const updateOrientation = () => setIsLandscape(getIsLandscape());
-
-    updateOrientation();
-    window.addEventListener("resize", updateOrientation);
-
-    if (media.addEventListener) {
-      media.addEventListener("change", updateOrientation);
-    }
-
-    return () => {
-      window.removeEventListener("resize", updateOrientation);
-      if (media.removeEventListener) {
-        media.removeEventListener("change", updateOrientation);
-      }
-    };
   }, []);
 
   // ===== DERIVED DATA =====
@@ -494,49 +461,40 @@ export default function App() {
         )}
 
         {/* ===== HELP ===== */}
-        {!isLandscape && (
-          <div style={styles.help}>
-            画面タップ1回で、進行方向が <strong>右 → 下 → 左 → 上</strong> の順に変わります。押しっぱなしでは連続反応しない作りです。
-          </div>
-        )}
+        <div style={styles.help}>
+          画面タップ1回で、進行方向が <strong>右 → 下 → 左 → 上</strong> の順に変わります。押しっぱなしでは連続反応しない作りです。
+        </div>
 
         {/* ===== SPEED SELECTOR ===== */}
         <div style={styles.speedRow}>
-          {(["slow", "normal", "fast"] as SpeedMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setSpeedMode(mode)}
-              style={{
-                ...styles.speedChip,
-                ...(speedMode === mode ? styles.speedChipActive : {}),
-              }}
-            >
-              {mode === "slow"
-                ? "Slow"
-                : mode === "normal"
-                  ? "Normal"
-                  : "Fast"}
-            </button>
-          ))}
+          {(["slow", "normal", "fast"] as SpeedMode[]).map((mode) => {
+            const disabled = status === "running";
+            return (
+              <button
+                key={mode}
+                onClick={() => {
+                  if (disabled) return;
+                  setSpeedMode(mode);
+                }}
+                style={{
+                  ...styles.speedChip,
+                  ...(speedMode === mode ? styles.speedChipActive : {}),
+                  ...(disabled ? styles.speedChipDisabled : {}),
+                }}
+                disabled={disabled}
+              >
+                {mode === "slow"
+                  ? "Slow"
+                  : mode === "normal"
+                    ? "Normal"
+                    : "Fast"}
+              </button>
+            );
+          })}
         </div>
 
-        {/* ===== PORTRAIT NOTICE ===== */}
-        {!isLandscape && (
-          <div style={styles.portraitNotice}>
-            横向きにすると、フィールド全体が見やすくなります。
-          </div>
-        )}
-
         {/* ===== BOARD ===== */}
-        <div
-          style={{
-            ...styles.boardWrap,
-            width: isLandscape
-              ? "min(100%, calc((100dvh - 190px) * 25 / 15))"
-              : "100%",
-          }}
-          onPointerDown={rotateDirection}
-        >
+        <div style={styles.boardWrap} onPointerDown={rotateDirection}>
           <div style={styles.boardAspect}>
             <div style={styles.boardGrid}>{cells}</div>
           </div>
