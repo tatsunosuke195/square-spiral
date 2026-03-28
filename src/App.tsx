@@ -59,6 +59,17 @@ function saveHighScores(value: HighScoreMap) {
   }
 }
 
+function vibrateIfSupported(duration: number) {
+  if (typeof navigator === "undefined") return;
+  if (typeof navigator.vibrate !== "function") return;
+
+  try {
+    navigator.vibrate(duration);
+  } catch {
+    // ignore vibration errors
+  }
+}
+
 // ===== STYLES =====
 const styles = {
   page: {
@@ -404,6 +415,7 @@ export default function App() {
 
   function rotateDirection() {
     if (status !== "running") return;
+    vibrateIfSupported(speedMode === "oni" ? 14 : 10);
     setDirectionIndex((prev) => (prev + 1) % 4);
   }
 
