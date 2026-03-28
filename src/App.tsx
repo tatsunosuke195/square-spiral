@@ -1,10 +1,11 @@
-// 四角い渦 鬼版 App.tsx v5
+// 四角い渦 鬼版 App.tsx v6
 // 2026-03-29
 // 変更点:
-// - 先頭マスのフラッシュを少し強めに調整
-// - Game Over時の盤面暗転をやめ、盤面の冷たい見え方を維持
-// - 鬼モードで300点以上達成後、通常画面のアイコンを 🌀 → 🍡 に変更
-// - コード冒頭に版名コメントを追加
+// - 横向き専用レイアウトを追加
+// - 横向きでは中央最大盤面 / 左にスコア / 右に速度切替 の固定配置
+// - 横向きではタイトル・アイコン・説明文を非表示
+// - 横向きでは 100dvh + overflow hidden でスクロールを発生させない
+// - 縦向きでは v5 のレイアウトを維持
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,8 +13,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 const COLS = 25;
 const ROWS = 15;
 const FAST_UNLOCK_SCORE = 250;
-const ONI_CLEAR_SCORE = 150;
+const ONI_CLEAR_SCORE = 300;
 const FLASH_MS = 120;
+const BOARD_RATIO = COLS / ROWS;
 
 const SPEED_OPTIONS = {
   slow: 115,
@@ -36,6 +38,7 @@ type Cell = { x: number; y: number };
 type Status = "idle" | "running" | "gameover";
 type SpeedMode = keyof typeof SPEED_OPTIONS;
 type HighScoreMap = Record<SpeedMode, number>;
+type ViewportSize = { width: number; height: number };
 
 // ===== HELPERS =====
 const DEFAULT_HIGHSCORES: HighScoreMap = {
@@ -44,6 +47,17 @@ const DEFAULT_HIGHSCORES: HighScoreMap = {
   fast: 0,
   oni: 0,
 };
+
+function getViewportSize(): ViewportSize {
+  if (typeof window === "undefined") {
+    return { width: 390, height: 844 };
+  }
+
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
 
 function loadHighScores(): HighScoreMap {
   try {
@@ -83,7 +97,6 @@ function vibrateIfSupported(duration: number) {
 // ===== STYLES =====
 const styles = {
   page: {
-    minHeight: "100vh",
     padding: "12px",
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -281,6 +294,44 @@ const styles = {
     fontWeight: 800,
     letterSpacing: "0.08em",
   } as React.CSSProperties,
+
+  landscapeShell: {
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  } as React.CSSProperties,
+
+  landscapeGrid: {
+    display: "grid",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: "100%",
+  } as React.CSSProperties,
+
+  landscapeSide: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    alignSelf: "stretch",
+    justifyContent: "flex-start",
+  } as React.CSSProperties,
+
+  landscapeBoardCenter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 0,
+    minHeight: 0,
+  } as React.CSSProperties,
+
+  landscapeSpeedStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    alignItems: "stretch",
+  } as React.CSSProperties,
 };
 
 const normalTheme = {
@@ -370,6 +421,7 @@ export default function App() {
   const [highScores, setHighScores] = useState<HighScoreMap>(DEFAULT_HIGHSCORES);
   const [wasNewBest, setWasNewBest] = useState(false);
   const [isHeadFlashing, setIsHeadFlashing] = useState(false);
+  const [viewport, setViewport] = useState<ViewportSize>(getViewportSize);
 
   // ===== REFS =====
   const lastStepRef = useRef<number | null>(null);
@@ -384,6 +436,14 @@ export default function App() {
     highScoresRef.current = loaded;
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => setViewport(getViewportSize());
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // ===== DERIVED DATA =====
   const occupiedSet = useMemo(() => {
     return new Set(path.map((cell) => `${cell.x},${cell.y}`));
@@ -395,10 +455,32 @@ export default function App() {
   const isOni = speedMode === "oni";
   const theme = isOni ? oniTheme : normalTheme;
   const headerIcon = isOni ? oniTheme.icon : oniCleared ? "🍡" : normalTheme.icon;
+  const isLandscape = viewport.width > viewport.height;
 
   const selectableModes: SpeedMode[] = oniUnlocked
     ? ["slow", "normal", "fast", "oni"]
     : ["slow", "normal", "fast"];
+
+  const landscapeMetrics = useMemo(() => {
+    const outerPadding = 12;
+    const gap = 12;
+    const sideWidth = Math.max(104, Math.min(132, viewport.width * 0.16));
+    const availableWidth = Math.max(
+      180,
+      viewport.width - outerPadding * 2 - gap * 2 - sideWidth * 2
+    );
+    const availableHeight = Math.max(120, viewport.height - outerPadding * 2);
+    const boardWidth = Math.min(availableWidth, availableHeight * BOARD_RATIO);
+    const boardHeight = boardWidth / BOARD_RATIO;
+
+    return {
+      outerPadding,
+      gap,
+      sideWidth,
+      boardWidth,
+      boardHeight,
+    };
+  }, [viewport]);
 
   function triggerHeadFlash() {
     setIsHeadFlashing(true);
@@ -563,17 +645,213 @@ export default function App() {
     }
   }
 
-  // ===== RENDER =====
-  return (
-    <div
-      style={{
-        ...styles.page,
-        background: theme.pageBg,
-        color: theme.pageText,
-      }}
-    >
+  function renderBoard(boardSize?: { width: number; height: number }) {
+    return (
+      <div
+        style={{
+          ...styles.boardWrap,
+          background: theme.boardBg,
+          border: `3px solid ${theme.boardBorder}`,
+          width: boardSize ? `${boardSize.width}px` : undefined,
+          height: boardSize ? `${boardSize.height}px` : undefined,
+        }}
+        onPointerDown={rotateDirection}
+      >
+        <div
+          style={
+            boardSize
+              ? { width: "100%", height: "100%" }
+              : styles.boardAspect
+          }
+        >
+          <div
+            style={{
+              ...styles.boardGrid,
+              background: theme.boardGridBg,
+            }}
+          >
+            {cells}
+          </div>
+        </div>
+
+        {status === "idle" && (
+          <div
+            style={{
+              ...styles.overlay,
+              background: theme.overlayBg,
+            }}
+          >
+            <div
+              style={{
+                ...styles.overlayCard,
+                background: theme.overlayCardBg,
+                border: `1px solid ${theme.overlayCardBorder}`,
+              }}
+            >
+              <p style={styles.overlayTitle}>スタート前</p>
+              <div style={{ ...styles.overlayText, color: theme.overlayText }}>
+                左上から右へ進みます。外壁か自分の足跡にぶつかったら終了です。
+              </div>
+              <button
+                onClick={() => startGame()}
+                style={{
+                  ...styles.overlayButton,
+                  background: theme.overlayButtonBg,
+                  color: theme.overlayButtonText,
+                }}
+              >
+                スタート
+              </button>
+            </div>
+          </div>
+        )}
+
+        {status === "gameover" && (
+          <div
+            style={{
+              ...styles.overlay,
+              background: "transparent",
+            }}
+          >
+            <div
+              style={{
+                ...styles.overlayCard,
+                background: theme.overlayCardBg,
+                border: `1px solid ${theme.overlayCardBorder}`,
+                ...(isOni ? styles.overlayCardHeavy : {}),
+              }}
+            >
+              <p
+                style={{
+                  ...styles.overlayTitle,
+                  ...(isOni ? styles.overlayTitleHeavy : {}),
+                }}
+              >
+                Game Over
+              </p>
+              <div style={{ ...styles.overlayText, color: theme.overlayText }}>
+                並んだ四角の数は <strong>{score}</strong> 個でした。
+              </div>
+              {wasNewBest && (
+                <div style={{ ...styles.newBest, color: theme.newBest }}>NEW BEST</div>
+              )}
+              <button
+                onClick={() => startGame()}
+                style={{
+                  ...styles.overlayButton,
+                  background: theme.overlayButtonBg,
+                  color: theme.overlayButtonText,
+                }}
+              >
+                もう一度
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderLandscape() {
+    return (
+      <div style={styles.landscapeShell}>
+        <div
+          style={{
+            ...styles.landscapeGrid,
+            gridTemplateColumns: `${landscapeMetrics.sideWidth}px ${landscapeMetrics.boardWidth}px ${landscapeMetrics.sideWidth}px`,
+            gap: `${landscapeMetrics.gap}px`,
+          }}
+        >
+          <div style={styles.landscapeSide}>
+            <div
+              style={{
+                ...styles.statCard,
+                background: theme.cardBg,
+                border: `1px solid ${theme.cardBorder}`,
+              }}
+            >
+              <div style={{ ...styles.statLabel, color: theme.subText }}>現在スコア</div>
+              <div style={styles.statValue}>{score}</div>
+            </div>
+
+            <div
+              style={{
+                ...styles.statCard,
+                background: theme.cardBg,
+                border: `1px solid ${theme.cardBorder}`,
+              }}
+            >
+              <div style={{ ...styles.statLabel, color: theme.subText }}>
+                {SPEED_LABELS[speedMode]} ハイスコア
+              </div>
+              <div style={styles.statValue}>{highScores[speedMode]}</div>
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {status === "running" && (
+              <button
+                onClick={() => resetGame()}
+                style={{
+                  ...styles.ghostButton,
+                  background: theme.ghostBg,
+                  border: `1px solid ${theme.ghostBorder}`,
+                  color: theme.ghostText,
+                }}
+              >
+                リセット
+              </button>
+            )}
+          </div>
+
+          <div style={styles.landscapeBoardCenter}>
+            {renderBoard({
+              width: landscapeMetrics.boardWidth,
+              height: landscapeMetrics.boardHeight,
+            })}
+          </div>
+
+          <div style={styles.landscapeSide}>
+            <div style={styles.landscapeSpeedStack}>
+              {selectableModes.map((mode) => {
+                const disabled = status === "running";
+                const active = speedMode === mode;
+
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      if (disabled) return;
+                      setSpeedMode(mode);
+                    }}
+                    style={{
+                      ...styles.speedChip,
+                      minWidth: "100%",
+                      background: active ? theme.speedActiveBg : theme.speedBg,
+                      border: `1px solid ${active ? theme.speedActiveBorder : theme.speedBorder}`,
+                      color: active ? theme.speedActiveText : theme.speedText,
+                      boxShadow: active
+                        ? "0 0 0 1px rgba(255,255,255,0.08), 0 6px 18px rgba(2,6,23,0.28)"
+                        : "none",
+                      transform: active ? "translateY(-1px)" : "translateY(0)",
+                      ...(disabled ? styles.speedChipDisabled : {}),
+                    }}
+                    disabled={disabled}
+                  >
+                    {SPEED_LABELS[mode]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPortrait() {
+    return (
       <div style={styles.container}>
-        {/* ===== HEADER ===== */}
         <div style={styles.header}>
           <div>
             <h1 style={styles.title}>四角い渦</h1>
@@ -592,7 +870,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ===== HUD ===== */}
         <div style={styles.hud}>
           <div
             style={{
@@ -632,7 +909,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ===== ACTIONS ===== */}
         {status === "running" && (
           <div style={styles.actions}>
             <button
@@ -649,12 +925,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ===== HELP ===== */}
         <div style={{ ...styles.help, color: theme.subText }}>
           画面タップ1回で、進行方向が <strong>右 → 下 → 左 → 上</strong> の順に変わります。押しっぱなしでは連続反応しない作りです。
         </div>
 
-        {/* ===== SPEED SELECTOR ===== */}
         <div style={styles.speedRow}>
           {selectableModes.map((mode) => {
             const disabled = status === "running";
@@ -686,105 +960,25 @@ export default function App() {
           })}
         </div>
 
-        {/* ===== BOARD ===== */}
-        <div
-          style={{
-            ...styles.boardWrap,
-            background: theme.boardBg,
-            border: `3px solid ${theme.boardBorder}`,
-          }}
-          onPointerDown={rotateDirection}
-        >
-          <div style={styles.boardAspect}>
-            <div
-              style={{
-                ...styles.boardGrid,
-                background: theme.boardGridBg,
-              }}
-            >
-              {cells}
-            </div>
-          </div>
-
-          {/* ===== IDLE OVERLAY ===== */}
-          {status === "idle" && (
-            <div
-              style={{
-                ...styles.overlay,
-                background: theme.overlayBg,
-              }}
-            >
-              <div
-                style={{
-                  ...styles.overlayCard,
-                  background: theme.overlayCardBg,
-                  border: `1px solid ${theme.overlayCardBorder}`,
-                }}
-              >
-                <p style={styles.overlayTitle}>スタート前</p>
-                <div style={{ ...styles.overlayText, color: theme.overlayText }}>
-                  左上から右へ進みます。外壁か自分の足跡にぶつかったら終了です。
-                </div>
-                <button
-                  onClick={() => startGame()}
-                  style={{
-                    ...styles.overlayButton,
-                    background: theme.overlayButtonBg,
-                    color: theme.overlayButtonText,
-                  }}
-                >
-                  スタート
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ===== GAMEOVER OVERLAY ===== */}
-          {status === "gameover" && (
-            <div
-              style={{
-                ...styles.overlay,
-                background: "transparent",
-              }}
-            >
-              <div
-                style={{
-                  ...styles.overlayCard,
-                  background: theme.overlayCardBg,
-                  border: `1px solid ${theme.overlayCardBorder}`,
-                  ...(isOni ? styles.overlayCardHeavy : {}),
-                }}
-              >
-                <p
-                  style={{
-                    ...styles.overlayTitle,
-                    ...(isOni ? styles.overlayTitleHeavy : {}),
-                  }}
-                >
-                  Game Over
-                </p>
-                <div style={{ ...styles.overlayText, color: theme.overlayText }}>
-                  並んだ四角の数は <strong>{score}</strong> 個でした。
-                </div>
-                {wasNewBest && (
-                  <div style={{ ...styles.newBest, color: theme.newBest }}>NEW BEST</div>
-                )}
-                <button
-                  onClick={() => startGame()}
-                  style={{
-                    ...styles.overlayButton,
-                    background: theme.overlayButtonBg,
-                    color: theme.overlayButtonText,
-                  }}
-                >
-                  もう一度
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        {renderBoard()}
       </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        ...styles.page,
+        background: theme.pageBg,
+        color: theme.pageText,
+        minHeight: isLandscape ? "100dvh" : "100vh",
+        height: isLandscape ? "100dvh" : undefined,
+        overflow: isLandscape ? "hidden" : undefined,
+      }}
+    >
+      {isLandscape ? renderLandscape() : renderPortrait()}
     </div>
   );
 }
+
 
