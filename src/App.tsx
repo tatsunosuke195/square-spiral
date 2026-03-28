@@ -1,10 +1,19 @@
+// 四角い渦 鬼版 App.tsx v5
+// 2026-03-29
+// 変更点:
+// - 先頭マスのフラッシュを少し強めに調整
+// - Game Over時の盤面暗転をやめ、盤面の冷たい見え方を維持
+// - 鬼モードで300点以上達成後、通常画面のアイコンを 🌀 → 🍡 に変更
+// - コード冒頭に版名コメントを追加
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 // ===== CONFIG =====
 const COLS = 25;
 const ROWS = 15;
 const FAST_UNLOCK_SCORE = 250;
-const FLASH_MS = 75;
+const ONI_CLEAR_SCORE = 150;
+const FLASH_MS = 120;
 
 const SPEED_OPTIONS = {
   slow: 115,
@@ -300,7 +309,8 @@ const normalTheme = {
   headCell: "#f8fafc",
   headInset: "inset 0 0 0 1px rgba(15,23,42,0.4)",
   headFlashCell: "#ffffff",
-  headFlashInset: "0 0 0 1px rgba(255,255,255,0.95), 0 0 14px rgba(255,255,255,0.55)",
+  headFlashInset:
+    "0 0 0 1px rgba(255,255,255,1), 0 0 24px rgba(255,255,255,0.95), 0 0 40px rgba(255,255,255,0.55)",
   overlayBg: "rgba(2, 6, 23, 0.55)",
   overlayCardBg: "rgba(15, 23, 42, 0.92)",
   overlayCardBorder: "#475569",
@@ -336,8 +346,9 @@ const oniTheme = {
   occupiedInset: "inset 0 0 0 1px rgba(69,10,10,0.4)",
   headCell: "#fff1f2",
   headInset: "inset 0 0 0 1px rgba(127,29,29,0.45)",
-  headFlashCell: "#ffe4e6",
-  headFlashInset: "0 0 0 1px rgba(255,241,242,0.95), 0 0 16px rgba(248,113,113,0.75)",
+  headFlashCell: "#fff1f2",
+  headFlashInset:
+    "0 0 0 1px rgba(255,241,242,1), 0 0 24px rgba(255,241,242,0.85), 0 0 42px rgba(248,113,113,0.9)",
   overlayBg: "rgba(69, 10, 10, 0.58)",
   overlayCardBg: "rgba(69, 10, 10, 0.92)",
   overlayCardBorder: "#f87171",
@@ -380,8 +391,10 @@ export default function App() {
 
   const headKey = `${path[path.length - 1].x},${path[path.length - 1].y}`;
   const oniUnlocked = highScores.fast >= FAST_UNLOCK_SCORE;
+  const oniCleared = highScores.oni >= ONI_CLEAR_SCORE;
   const isOni = speedMode === "oni";
   const theme = isOni ? oniTheme : normalTheme;
+  const headerIcon = isOni ? oniTheme.icon : oniCleared ? "🍡" : normalTheme.icon;
 
   const selectableModes: SpeedMode[] = oniUnlocked
     ? ["slow", "normal", "fast", "oni"]
@@ -575,7 +588,7 @@ export default function App() {
               border: `1px solid ${theme.iconBorder}`,
             }}
           >
-            {theme.icon}
+            {headerIcon}
           </div>
         </div>
 
@@ -731,7 +744,7 @@ export default function App() {
             <div
               style={{
                 ...styles.overlay,
-                background: isOni ? "rgba(20, 0, 0, 0.72)" : theme.overlayBg,
+                background: "transparent",
               }}
             >
               <div
