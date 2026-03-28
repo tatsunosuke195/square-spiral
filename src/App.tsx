@@ -1,10 +1,10 @@
-// 四角い渦 鬼版 App.tsx v6
+// 四角い渦 鬼版 App.tsx v7
 // 2026-03-29
 // 変更点:
-// - 横向き専用レイアウトを追加
-// - 横向きでは中央最大盤面 / 左にスコア / 右に速度切替 の固定配置
-// - 横向きではタイトル・アイコン・説明文を非表示
-// - 横向きでは 100dvh + overflow hidden でスクロールを発生させない
+// - 横向き専用レイアウトをさらに圧縮して、盤面を少し拡大
+// - 横向きの左情報パネルを細く調整
+// - 横向きのハイスコア表示を2行化して横幅を節約
+// - 横向きの速度ボタンを少しコンパクト化
 // - 縦向きでは v5 のレイアウトを維持
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -329,7 +329,7 @@ const styles = {
   landscapeSpeedStack: {
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
+    gap: "8px",
     alignItems: "stretch",
   } as React.CSSProperties,
 };
@@ -412,10 +412,9 @@ const oniTheme = {
 
 // ===== COMPONENT =====
 export default function App() {
-  // ===== STATE =====
   const [status, setStatus] = useState<Status>("idle");
   const [path, setPath] = useState<Cell[]>([{ x: 0, y: 0 }]);
-  const [directionIndex, setDirectionIndex] = useState(0); // 0:right 1:down 2:left 3:up
+  const [directionIndex, setDirectionIndex] = useState(0);
   const [score, setScore] = useState(1);
   const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
   const [highScores, setHighScores] = useState<HighScoreMap>(DEFAULT_HIGHSCORES);
@@ -423,13 +422,11 @@ export default function App() {
   const [isHeadFlashing, setIsHeadFlashing] = useState(false);
   const [viewport, setViewport] = useState<ViewportSize>(getViewportSize);
 
-  // ===== REFS =====
   const lastStepRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const highScoresRef = useRef<HighScoreMap>(DEFAULT_HIGHSCORES);
   const flashTimeoutRef = useRef<number | null>(null);
 
-  // ===== INITIAL LOAD =====
   useEffect(() => {
     const loaded = loadHighScores();
     setHighScores(loaded);
@@ -438,13 +435,11 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => setViewport(getViewportSize());
-
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ===== DERIVED DATA =====
   const occupiedSet = useMemo(() => {
     return new Set(path.map((cell) => `${cell.x},${cell.y}`));
   }, [path]);
@@ -462,9 +457,9 @@ export default function App() {
     : ["slow", "normal", "fast"];
 
   const landscapeMetrics = useMemo(() => {
-    const outerPadding = 12;
-    const gap = 12;
-    const sideWidth = Math.max(104, Math.min(132, viewport.width * 0.16));
+    const outerPadding = 10;
+    const gap = 8;
+    const sideWidth = Math.max(92, Math.min(112, viewport.width * 0.14));
     const availableWidth = Math.max(
       180,
       viewport.width - outerPadding * 2 - gap * 2 - sideWidth * 2
@@ -495,7 +490,6 @@ export default function App() {
     }, FLASH_MS);
   }
 
-  // ===== ACTIONS =====
   function resetGame(nextStatus: Status = "idle") {
     setStatus(nextStatus);
     setPath([{ x: 0, y: 0 }]);
@@ -540,7 +534,6 @@ export default function App() {
     setDirectionIndex((prev) => (prev + 1) % 4);
   }
 
-  // ===== SAFETY =====
   useEffect(() => {
     if (speedMode === "oni" && !oniUnlocked) {
       setSpeedMode("fast");
@@ -555,7 +548,6 @@ export default function App() {
     };
   }, []);
 
-  // ===== GAME LOOP =====
   useEffect(() => {
     if (status !== "running") {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -613,7 +605,6 @@ export default function App() {
     };
   }, [status, directionIndex, speedMode]);
 
-  // ===== BOARD CELLS =====
   const cells: React.ReactNode[] = [];
   for (let y = 0; y < ROWS; y += 1) {
     for (let x = 0; x < COLS; x += 1) {
@@ -657,30 +648,12 @@ export default function App() {
         }}
         onPointerDown={rotateDirection}
       >
-        <div
-          style={
-            boardSize
-              ? { width: "100%", height: "100%" }
-              : styles.boardAspect
-          }
-        >
-          <div
-            style={{
-              ...styles.boardGrid,
-              background: theme.boardGridBg,
-            }}
-          >
-            {cells}
-          </div>
+        <div style={boardSize ? { width: "100%", height: "100%" } : styles.boardAspect}>
+          <div style={{ ...styles.boardGrid, background: theme.boardGridBg }}>{cells}</div>
         </div>
 
         {status === "idle" && (
-          <div
-            style={{
-              ...styles.overlay,
-              background: theme.overlayBg,
-            }}
-          >
+          <div style={{ ...styles.overlay, background: theme.overlayBg }}>
             <div
               style={{
                 ...styles.overlayCard,
@@ -707,12 +680,7 @@ export default function App() {
         )}
 
         {status === "gameover" && (
-          <div
-            style={{
-              ...styles.overlay,
-              background: "transparent",
-            }}
-          >
+          <div style={{ ...styles.overlay, background: "transparent" }}>
             <div
               style={{
                 ...styles.overlayCard,
@@ -768,10 +736,13 @@ export default function App() {
                 ...styles.statCard,
                 background: theme.cardBg,
                 border: `1px solid ${theme.cardBorder}`,
+                padding: "9px 10px",
               }}
             >
-              <div style={{ ...styles.statLabel, color: theme.subText }}>現在スコア</div>
-              <div style={styles.statValue}>{score}</div>
+              <div style={{ ...styles.statLabel, color: theme.subText, lineHeight: 1.15 }}>
+                現在スコア
+              </div>
+              <div style={{ ...styles.statValue, fontSize: "26px" }}>{score}</div>
             </div>
 
             <div
@@ -779,12 +750,23 @@ export default function App() {
                 ...styles.statCard,
                 background: theme.cardBg,
                 border: `1px solid ${theme.cardBorder}`,
+                padding: "9px 10px",
               }}
             >
-              <div style={{ ...styles.statLabel, color: theme.subText }}>
-                {SPEED_LABELS[speedMode]} ハイスコア
+              <div
+                style={{
+                  ...styles.statLabel,
+                  color: theme.subText,
+                  lineHeight: 1.1,
+                  marginBottom: "6px",
+                }}
+              >
+                <div>ハイスコア</div>
+                <div style={{ fontSize: "11px", marginTop: "2px" }}>
+                  - {SPEED_LABELS[speedMode]} -
+                </div>
               </div>
-              <div style={styles.statValue}>{highScores[speedMode]}</div>
+              <div style={{ ...styles.statValue, fontSize: "26px" }}>{highScores[speedMode]}</div>
             </div>
 
             <div style={{ flex: 1 }} />
@@ -797,6 +779,7 @@ export default function App() {
                   background: theme.ghostBg,
                   border: `1px solid ${theme.ghostBorder}`,
                   color: theme.ghostText,
+                  padding: "10px 10px",
                 }}
               >
                 リセット
@@ -827,6 +810,8 @@ export default function App() {
                     style={{
                       ...styles.speedChip,
                       minWidth: "100%",
+                      padding: "10px 10px",
+                      fontSize: "13px",
                       background: active ? theme.speedActiveBg : theme.speedBg,
                       border: `1px solid ${active ? theme.speedActiveBorder : theme.speedBorder}`,
                       color: active ? theme.speedActiveText : theme.speedText,
