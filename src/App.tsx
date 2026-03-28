@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 const COLS = 25;
 const ROWS = 15;
 const FAST_UNLOCK_SCORE = 250;
+const FLASH_MS = 75;
 
 const SPEED_OPTIONS = {
   slow: 115,
@@ -298,6 +299,8 @@ const normalTheme = {
   occupiedInset: "inset 0 0 0 1px rgba(15,23,42,0.28)",
   headCell: "#f8fafc",
   headInset: "inset 0 0 0 1px rgba(15,23,42,0.4)",
+  headFlashCell: "#ffffff",
+  headFlashInset: "0 0 0 1px rgba(255,255,255,0.95), 0 0 14px rgba(255,255,255,0.55)",
   overlayBg: "rgba(2, 6, 23, 0.55)",
   overlayCardBg: "rgba(15, 23, 42, 0.92)",
   overlayCardBorder: "#475569",
@@ -333,6 +336,8 @@ const oniTheme = {
   occupiedInset: "inset 0 0 0 1px rgba(69,10,10,0.4)",
   headCell: "#fff1f2",
   headInset: "inset 0 0 0 1px rgba(127,29,29,0.45)",
+  headFlashCell: "#ffe4e6",
+  headFlashInset: "0 0 0 1px rgba(255,241,242,0.95), 0 0 16px rgba(248,113,113,0.75)",
   overlayBg: "rgba(69, 10, 10, 0.58)",
   overlayCardBg: "rgba(69, 10, 10, 0.92)",
   overlayCardBorder: "#f87171",
@@ -353,11 +358,13 @@ export default function App() {
   const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
   const [highScores, setHighScores] = useState<HighScoreMap>(DEFAULT_HIGHSCORES);
   const [wasNewBest, setWasNewBest] = useState(false);
+  const [isHeadFlashing, setIsHeadFlashing] = useState(false);
 
   // ===== REFS =====
   const lastStepRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const highScoresRef = useRef<HighScoreMap>(DEFAULT_HIGHSCORES);
+  const flashTimeoutRef = useRef<number | null>(null);
 
   // ===== INITIAL LOAD =====
   useEffect(() => {
@@ -380,6 +387,19 @@ export default function App() {
     ? ["slow", "normal", "fast", "oni"]
     : ["slow", "normal", "fast"];
 
+  function triggerHeadFlash() {
+    setIsHeadFlashing(true);
+
+    if (flashTimeoutRef.current !== null) {
+      window.clearTimeout(flashTimeoutRef.current);
+    }
+
+    flashTimeoutRef.current = window.setTimeout(() => {
+      setIsHeadFlashing(false);
+      flashTimeoutRef.current = null;
+    }, FLASH_MS);
+  }
+
   // ===== ACTIONS =====
   function resetGame(nextStatus: Status = "idle") {
     setStatus(nextStatus);
@@ -387,6 +407,11 @@ export default function App() {
     setDirectionIndex(0);
     setScore(1);
     setWasNewBest(false);
+    setIsHeadFlashing(false);
+    if (flashTimeoutRef.current !== null) {
+      window.clearTimeout(flashTimeoutRef.current);
+      flashTimeoutRef.current = null;
+    }
     lastStepRef.current = null;
   }
 
@@ -416,6 +441,7 @@ export default function App() {
   function rotateDirection() {
     if (status !== "running") return;
     vibrateIfSupported(speedMode === "oni" ? 14 : 10);
+    triggerHeadFlash();
     setDirectionIndex((prev) => (prev + 1) % 4);
   }
 
@@ -425,6 +451,14 @@ export default function App() {
       setSpeedMode("fast");
     }
   }, [oniUnlocked, speedMode]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimeoutRef.current !== null) {
+        window.clearTimeout(flashTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ===== GAME LOOP =====
   useEffect(() => {
@@ -506,8 +540,8 @@ export default function App() {
               : {}),
             ...(isHead
               ? {
-                  background: theme.headCell,
-                  boxShadow: theme.headInset,
+                  background: isHeadFlashing ? theme.headFlashCell : theme.headCell,
+                  boxShadow: isHeadFlashing ? theme.headFlashInset : theme.headInset,
                 }
               : {}),
           }}
@@ -740,3 +774,4 @@ export default function App() {
     </div>
   );
 }
+
